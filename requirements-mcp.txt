@@ -1,0 +1,12 @@
+# W3 — MCP server requirements (additive)
+#
+# Pin to a version that ships ``sse-starlette`` compatible with the
+# project's FastAPI 0.115.x, which requires ``starlette>=0.40,<0.47``.
+#
+# mcp 1.13.x bundles sse-starlette 3.0.x (compatible).
+# mcp 1.28.x bundles sse-starlette 3.4.x (needs starlette>=0.49.1) —
+# NOT compatible with FastAPI 0.115.x, do NOT upgrade without a
+# FastAPI/starlette upgrade first.
+mcp>=1.13,<1.20
+sse-starlette>=3.0,<3.3
+starlette>=0.40,<0.47
