@@ -1,0 +1,13 @@
+[Unit]
+Description=Exchange to Google Calendar sync
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=user
+WorkingDirectory=/home/user/gcal-sync
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/user/gcal-sync/.venv/bin/python /home/user/gcal-sync/sync.py
+TimeoutStartSec=600
+Nice=10

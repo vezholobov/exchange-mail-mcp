@@ -1,0 +1,10 @@
+{
+  "exchange_url": "http://172.17.0.1:5015",
+  "calendar_id": "you@gmail.com",
+  "service_account_key": "/home/user/.config/exchange-gcal-sync/service-account.json",
+  "days_back": 7,
+  "days_forward": 60,
+  "state_db": "/home/user/.local/state/exchange-gcal-sync/state.sqlite3",
+  "max_deletes": 50,
+  "dry_run": false
+}

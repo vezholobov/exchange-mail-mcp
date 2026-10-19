@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Exchange to Google Calendar sync every 15 minutes
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target
