@@ -101,6 +101,13 @@ class SearchCalendarRequest(BaseModel):
     query: str
     days: int = 30 
 
+class CalendarRangeRequest(BaseModel):
+    """Structured calendar range request for external calendar sync."""
+    start: str = None
+    end: str = None
+    days_back: int = 7
+    days_forward: int = 60
+
 class NewEventRequest(BaseModel):
     subject: str
     start_time: str 
@@ -695,6 +702,85 @@ def read_calendar(req: CalendarRequest):
             
         return {"result": "\n".join(res) if res else f"No events on {target_date}."}
     except Exception as e: return {"result": str(e)}
+
+def _parse_calendar_bound(value: str, default: datetime) -> datetime:
+    """Parse an ISO date/datetime into an aware MSK datetime."""
+    if not value:
+        return default
+    raw = value.strip().replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        dt = datetime.strptime(raw[:10], "%Y-%m-%d")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=MSK_TZ)
+    return dt.astimezone(MSK_TZ)
+
+
+@app.post("/calendar_events_json")
+def calendar_events_json(req: CalendarRangeRequest):
+    """Structured, read-only calendar export used by the Google Calendar bridge.
+
+    Returns occurrences expanded by EWS within the requested range, including
+    ``uid`` and ``recurrence_id`` so callers can build an idempotent mapping.
+    The legacy text endpoint ``/get_calendar`` is left untouched.
+    """
+    account = get_account()
+    if not account:
+        raise HTTPException(status_code=503, detail="Exchange connection failed")
+
+    now_msk = datetime.now(MSK_TZ)
+    start = _parse_calendar_bound(
+        req.start, now_msk - timedelta(days=max(0, min(req.days_back, 365)))
+    )
+    end = _parse_calendar_bound(
+        req.end, now_msk + timedelta(days=max(1, min(req.days_forward, 365)))
+    )
+    if end <= start:
+        raise HTTPException(status_code=400, detail="end must be after start")
+    if (end - start).days > 400:
+        raise HTTPException(status_code=400, detail="range too large (max 400 days)")
+
+    try:
+        items = account.calendar.view(start=start, end=end)
+        events = []
+        for i in items:
+            st = i.start.astimezone(MSK_TZ)
+            en = i.end.astimezone(MSK_TZ)
+            uid = getattr(i, "uid", None) or ""
+            rid = getattr(i, "recurrence_id", None)
+            if hasattr(rid, "isoformat"):
+                rid_out = rid.isoformat()
+            elif rid:
+                rid_out = str(rid)
+            else:
+                rid_out = None
+            sensitivity = str(getattr(i, "sensitivity", "") or "").lower()
+            last_mod = getattr(i, "last_modified_time", None)
+            events.append({
+                "uid": uid,
+                "recurrence_id": rid_out,
+                "subject": i.subject or "",
+                "start": st.isoformat(),
+                "end": en.isoformat(),
+                "location": i.location or "",
+                "organizer": i.organizer.email_address if getattr(i, "organizer", None) else None,
+                "is_all_day": bool(getattr(i, "is_all_day", False)),
+                "is_cancelled": bool(getattr(i, "is_cancelled", False)),
+                "is_private": "private" in sensitivity,
+                "last_modified": last_mod.astimezone(MSK_TZ).isoformat() if last_mod else None,
+            })
+        events.sort(key=lambda e: e["start"])
+        return {
+            "status": "ok",
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "count": len(events),
+            "events": events,
+        }
+    except Exception as e:
+        logger.exception("calendar_events_json failed")
+        raise HTTPException(status_code=500, detail=f"calendar read failed: {e}")
 
 @app.post("/search_calendar")
 def search_calendar_events(req: SearchCalendarRequest):

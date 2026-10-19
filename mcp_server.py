@@ -530,6 +530,28 @@ def work_calendar_delete(subject: str) -> Dict[str, Any]:
     return _http_request("POST", "/delete_event", {"subject": subject})
 
 
+def work_calendar_events(
+    start: str = "",
+    end: str = "",
+    days_back: int = 7,
+    days_forward: int = 60,
+) -> Dict[str, Any]:
+    """POST /calendar_events_json — structured events for calendar sync.
+
+    Returns expanded occurrences with ``uid``/``recurrence_id`` so external
+    calendars (Google) can build an idempotent mapping. Read-only.
+    """
+    payload: Dict[str, Any] = {
+        "days_back": days_back,
+        "days_forward": days_forward,
+    }
+    if start:
+        payload["start"] = start
+    if end:
+        payload["end"] = end
+    return _http_request("POST", "/calendar_events_json", payload)
+
+
 # ---------------------------------------------------------------------------
 # Tool registration — single source of truth for the exposed tool list.
 # ---------------------------------------------------------------------------
@@ -554,6 +576,7 @@ TOOL_REGISTRY: List[Dict[str, str]] = [
     {"name": "work_calendar_search", "impl": "work_calendar_search", "kind": "tool"},
     {"name": "work_calendar_add", "impl": "work_calendar_add", "kind": "tool"},
     {"name": "work_calendar_delete", "impl": "work_calendar_delete", "kind": "tool"},
+    {"name": "work_calendar_events", "impl": "work_calendar_events", "kind": "tool"},
 ]
 
 
